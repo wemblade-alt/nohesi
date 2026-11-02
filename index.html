@@ -1,220 +1,569 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NO HESI 3D</title>
-<style>
-*{box-sizing:border-box}
-body{margin:0;overflow:hidden;background:#080b12;color:white;font-family:Arial}
-canvas{display:block}
-#hud{position:fixed;top:20px;left:20px;pointer-events:none}
-#speed{position:fixed;bottom:25px;left:25px;font-size:55px;font-weight:bold}
-#speed small{font-size:15px}
-#menu{position:fixed;inset:0;background:#080b12;display:grid;place-items:center;text-align:center;z-index:5}
-h1{font-size:75px;margin:0;letter-spacing:-5px}
-h1 span{color:#f22}
-button{background:#f22;color:white;border:0;padding:16px 30px;font-weight:bold;cursor:pointer;margin:8px}
-#help{position:fixed;bottom:25px;right:25px;text-align:right;font-size:12px}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultra No Hesi - Next-Gen WebGL Cutting Up Simulator</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #020205;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            user-select: none;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 25px;
+            box-sizing: border-box;
+        }
+        .hud-cluster {
+            display: flex;
+            gap: 20px;
+        }
+        .hud-box {
+            background: linear-gradient(135deg, rgba(15, 15, 30, 0.85), rgba(5, 5, 10, 0.95));
+            padding: 12px 25px;
+            border-radius: 16px;
+            border: 1px solid rgba(0, 255, 204, 0.15);
+            backdrop-filter: blur(12px);
+            pointer-events: auto;
+            color: white;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255,255,255,0.1);
+        }
+        #score-title { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: #889; }
+        #score-val { font-size: 36px; font-weight: 800; color: #00ffcc; text-shadow: 0 0 15px rgba(0,255,204,0.4); font-family: monospace; }
+        
+        #cluster-right {
+            align-self: flex-end;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 10px;
+        }
+        #speed-o-meter {
+            text-align: right;
+            border-right: 5px solid #ff0055;
+            min-width: 140px;
+        }
+        #speed-val { font-size: 52px; font-weight: 900; color: #fff; line-height: 1; font-family: monospace; }
+        #speed-unit { font-size: 12px; color: #ff0055; font-weight: bold; letter-spacing: 1px; }
+        
+        /* RPM Gauge */
+        #rpm-bar-container {
+            width: 180px;
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        #rpm-bar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #00ffcc, #ffaa00, #ff0055);
+            transition: width 0.05s linear;
+        }
+
+        #combo-alert {
+            position: absolute;
+            top: 35%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.7);
+            color: #fff;
+            font-size: 46px;
+            font-weight: 900;
+            font-style: italic;
+            text-shadow: 0 0 10px #ff0055, 0 0 30px #ff0055;
+            opacity: 0;
+            transition: all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            letter-spacing: -1px;
+        }
+        #game-over-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(circle, rgba(15, 10, 25, 0.95) 0%, rgba(5, 5, 10, 0.98) 100%);
+            backdrop-filter: blur(20px);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s ease;
+        }
+        #game-over-screen.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .btn {
+            background: linear-gradient(135deg, #ff0055, #9900ff);
+            border: none;
+            color: white;
+            padding: 16px 45px;
+            font-size: 18px;
+            font-weight: 800;
+            border-radius: 40px;
+            cursor: pointer;
+            margin-top: 25px;
+            box-shadow: 0 8px 30px rgba(255, 0, 85, 0.4);
+            transition: all 0.2s ease;
+            letter-spacing: 1px;
+        }
+        .btn:hover { 
+            transform: translateY(-2px) scale(1.03); 
+            box-shadow: 0 12px 35px rgba(255, 0, 85, 0.6);
+        }
+        .controls-hint {
+            color: #556;
+            margin-top: 20px;
+            font-size: 13px;
+            text-align: center;
+            line-height: 1.6;
+        }
+    </style>
 </head>
 <body>
-<div id="menu">
- <div>
-  <h1>NO <span>HESI</span></h1>
-  <p>3D HIGHWAY SIMULATOR</p>
-  <p>Drive fast. Dodge traffic. Don't crash.</p>
-  <button id="start">START DRIVING</button>
-  <p>WASD / ARROWS TO DRIVE • SHIFT = NITRO • C = CAMERA</p>
- </div>
-</div>
-<div id="hud">NO HESI 3D<br>HIGHWAY RUN</div>
-<div id="speed">000 <small>MPH</small></div>
-<div id="help">WASD - DRIVE<br>SPACE - DRIFT<br>SHIFT - NITRO<br>C - CAMERA</div>
 
-<script type="importmap">
-{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"}}
-</script>
-<script type="module">
-import * as THREE from "three";
+    <div id="canvas-container"></div>
 
-const scene=new THREE.Scene();
-scene.background=new THREE.Color(0x91a5bb);
-scene.fog=new THREE.Fog(0x91a5bb,90,300);
+    <div id="ui-layer">
+        <div class="hud-cluster">
+            <div id="score-board" class="hud-box">
+                <div id="score-title">SCORE & DISTANCE</div>
+                <div id="score-val">000000</div>
+            </div>
+        </div>
+        
+        <div id="cluster-right">
+            <div id="speed-o-meter" class="hud-box">
+                <div id="speed-val">0</div>
+                <div id="speed-unit">MPH</div>
+                <div id="rpm-bar-container"><div id="rpm-bar"></div></div>
+            </div>
+        </div>
+    </div>
 
-const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.1,700);
-camera.position.set(0,6,13);
+    <div id="combo-alert">WHITELINE +1,000</div>
 
-const renderer=new THREE.WebGLRenderer({antialias:true});
-renderer.setSize(innerWidth,innerHeight);
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-renderer.shadowMap.enabled=true;
-renderer.toneMapping=THREE.ACESFilmicToneMapping;
-document.body.appendChild(renderer.domElement);
+    <div id="game-over-screen">
+        <h1 style="font-size: 72px; font-weight:900; margin-bottom: 5px; background: linear-gradient(to right, #ff0055, #ff5500); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 15px rgba(255,0,85,0.3));">WRECKED</h1>
+        <p style="font-size: 18px; color: #889; letter-spacing:1px;">Traffic cut you off.</p>
+        <div style="font-size: 32px; margin-top: 15px;">TOTAL SCORE: <span id="final-score" style="color: #00ffcc; font-weight: 800;">0</span></div>
+        <button class="btn" onclick="resetGame()">SWIM AGAIN</button>
+        <div class="controls-hint">
+            <b>A / D</b> or <b>← / →</b> to weave smoothly<br>
+            Hold <b>W / ↑</b> for Nitro Redline acceleration
+        </div>
+    </div>
 
-scene.add(new THREE.HemisphereLight(0xcce4ff,0x303030,2));
-const sun=new THREE.DirectionalLight(0xffffff,3);
-sun.position.set(-20,40,20);
-sun.castShadow=true;
-scene.add(sun);
+    <!-- Main Engine Dependencies (Three.js Engine) -->
+    <script src="https://cloudflare.com"></script>
 
-function material(color,roughness=.6,metalness=.1){
- return new THREE.MeshStandardMaterial({color,roughness,metalness});
-}
-function cube(parent,w,h,d,x,y,z,mat){
- const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
- m.position.set(x,y,z);
- m.castShadow=true;
- m.receiveShadow=true;
- parent.add(m);
- return m;
-}
+    <script>
+        // --- MOTORWORLD APPLICATION STATE ---
+        let scene, camera, renderer;
+        let playerCar, highway, traffic = [];
+        let keys = { a: false, d: false, w: false, ArrowLeft: false, ArrowRight: false, ArrowUp: false };
+        let gameActive = true;
+        let score = 0;
+        let speed = 120;
+        let baseSpeed = 120;
+        let maxSpeed = 210;
+        let targetLaneX = 0;
+        const laneWidth = 4.6;
+        const totalLanes = 4;
+        
+        // Dynamic Animation Variables
+        let globalTime = 0;
+        let camVibration = 0;
+        let neonPoles = [];
 
-// Highway
-cube(scene,24,.2,650,0,-.3,-280,material(0x24282c));
-cube(scene,500,.1,650,0,-.5,-280,material(0x374a36));
-for(let x of [-8,-4,0,4,8]){
- for(let z=-600;z<30;z+=14){
-  cube(scene,.1,.025,5,x,-.18,z,material(0xffffff));
- }
-}
-for(let x of [-12,12]){
- cube(scene,.3,.4,650,x,-.1,-280,material(0x777777));
-}
+        function init() {
+            const container = document.getElementById('canvas-container');
+            
+            // 1. Scene setup with rich volumetric Cyber-fog
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x020205, 0.0095);
 
-// City buildings
-const buildings=[];
-for(let i=0;i<70;i++){
- let side=i%2?1:-1;
- let h=10+Math.random()*40;
- let b=new THREE.Group();
- cube(b,10,h,12,0,h/2,0,material(0x3d4753));
- b.position.set(side*(20+Math.random()*30),0,-Math.random()*550);
- scene.add(b);
- buildings.push(b);
-}
+            camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 1000);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.4;
+            container.appendChild(renderer.domElement);
 
-// Car
-function createCar(color){
- const car=new THREE.Group();
- const paint=material(color,.2,.8);
- const glass=new THREE.MeshPhysicalMaterial({color:0x172d40,metalness:.5,roughness:.15});
- cube(car,2.1,.6,4.5,0,.8,0,paint);
- cube(car,1.7,.8,2.1,0,1.45,-.3,glass);
- cube(car,1.9,.15,.12,0,.9,-2.3,material(0xffffff));
- cube(car,1.9,.15,.12,0,.9,2.3,material(0xff001c));
- const wheels=[];
- for(let x of [-1.1,1.1]){
-  for(let z of [-1.5,1.5]){
-   let w=new THREE.Mesh(new THREE.CylinderGeometry(.43,.43,.25,24),material(0x101010));
-   w.rotation.z=Math.PI/2;
-   w.position.set(x,.45,z);
-   car.add(w);
-   wheels.push(w);
-  }
- }
- car.userData.wheels=wheels;
- return car;
-}
-let player=createCar(0xe51c35);
-scene.add(player);
+            // 2. Midnight Atmosphere Illumination Matrix
+            const ambient = new THREE.AmbientLight(0x080816, 1.2);
+            scene.add(ambient);
 
-// Traffic
-const traffic=[];
-const colors=[0xffffff,0x171717,0x176aaf,0x888888,0xd7a72c];
-function spawn(z){
- const car=createCar(colors[Math.floor(Math.random()*colors.length)]);
- const lane=[-10,-6,-2,2,6,10][Math.floor(Math.random()*6)];
- car.position.set(lane,0,z);
- car.rotation.y=Math.PI;
- scene.add(car);
- traffic.push({car,speed:40+Math.random()*35});
-}
-for(let i=0;i<20;i++)spawn(-35-i*25);
+            const moonLight = new THREE.DirectionalLight(0x334477, 1.8);
+            moonLight.position.set(30, 60, 40);
+            scene.add(moonLight);
 
-let speed=0,steer=0,nitro=100,distance=0;
-let started=false,cam=0,drift=false;
-const keys={};
-addEventListener("keydown",e=>{
- keys[e.key.toLowerCase()]=true;
- if(e.key.toLowerCase()==="c")cam=(cam+1)%3;
+            // 3. Populate Level Architecture
+            createHighway();
+            createPlayerCar();
+            spawnInitialTraffic();
+
+            // Set up aggressive wide-angle pursuit cam positioning
+            camera.position.set(0, 3.8, 8.5);
+            camera.lookAt(new THREE.Vector3(0, 1.2, -20));
+
+            // 4. Hook Event Listeners
+            window.addEventListener('keydown', e => handleInput(e, true));
+            window.addEventListener('keyup', e => handleInput(e, false));
+            window.addEventListener('resize', onResize);
+
+            // 5. Ignition Loop
+            animate();
+        }
+
+        // --- UPGRADED PROCEDURAL HYPERCAR SPEC-DESIGN ---
+        function createVehicle(paintColor, isPlayer = false) {
+            const car = new THREE.Group();
+
+            // Next-Gen Metallic Clearcoat Specular Materials
+            const bodyMat = new THREE.MeshStandardMaterial({
+                color: paintColor,
+                roughness: 0.04,
+                metalness: 0.95,
+                clearcoat: 1.0,
+                clearcoatRoughness: 0.02
+            });
+
+            const trimMat = new THREE.MeshStandardMaterial({ color: 0x08080a, roughness: 0.6, metalness: 0.2 });
+            const windowMat = new THREE.MeshStandardMaterial({ color: 0x020205, roughness: 0.05, metalness: 0.95 });
+            const wheelRimMat = new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.1, metalness: 1.0 });
+            const tireMat = new THREE.MeshStandardMaterial({ color: 0x111113, roughness: 0.85 });
+
+            // Base Carbon Aero Tray Splitter
+            const tray = new THREE.Mesh(new THREE.BoxGeometry(2.15, 0.15, 4.8), trimMat);
+            tray.position.y = 0.18;
+Use code with caution.
+car.add(tray);
+// Sculpted Main Monocoque Chassis
+const mainBody = new THREE.Mesh(new THREE.BoxGeometry(2.05, 0.65, 4.5), bodyMat);
+mainBody.position.y = 0.58;
+mainBody.castShadow = true;
+mainBody.receiveShadow = true;
+car.add(mainBody);
+// Flanted Aggressive Cabin Greenhouse
+const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.68, 0.52, 2.1), windowMat);
+cabin.position.set(0, 1.08, -0.15);
+car.add(cabin);
+// Carbon Rear Wing Spoiler Array
+const wingStrutL = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.3, 0.2), trimMat);
+wingStrutL.position.set(-0.8, 1.0, 2.0);
+const wingStrutR = wingStrutL.clone();
+wingStrutR.position.x = 0.8;
+const wingBlade = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.05, 0.4), trimMat);
+wingBlade.position.set(0, 1.15, 2.0);
+car.add(wingStrutL, wingStrutR, wingBlade);
+// Functional Wheel Hub Assembly Assemblies (With spinning geometry tags)
+const wheelGeo = new THREE.CylinderGeometry(0.44, 0.44, 0.35, 24);
+wheelGeo.rotateZ(Math.PI / 2);
+// Decorative Spokes so rotation is visible
+const spokeGeo = new THREE.BoxGeometry(0.8, 0.08, 0.25);
+const wheelPositions = [
+{ name: 'rl', pos: [-1.08, 0.44, 1.35] },
+{ name: 'rr', pos: [1.08, 0.44, 1.35] },
+{ name: 'fl', pos: [-1.08, 0.44, -1.45] },
+{ name: 'fr', pos: [1.08, 0.44, -1.45] }
+];
+car.userData.wheels = [];
+wheelPositions.forEach(wSpec => {
+const wGroup = new THREE.Group();
+wGroup.position.set(...wSpec.pos);
+const tire = new THREE.Mesh(wheelGeo, tireMat);
+tire.castShadow = true;
+wGroup.add(tire);
+const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.36, 16), wheelRimMat);
+rim.rotateZ(Math.PI/2);
+wGroup.add(rim);
+const spoke = new THREE.Mesh(spokeGeo, trimMat);
+spoke.position.x = wSpec.pos[0] > 0 ? 0.18 : -0.18;
+wGroup.add(spoke);
+car.add(wGroup);
+car.userData.wheels.push(wGroup);
 });
-addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
-
-document.getElementById("start").onclick=()=>{
- document.getElementById("menu").style.display="none";
- started=true;
+// Lighting Clusters
+const emitterMatHead = new THREE.MeshBasicMaterial({ color: 0xffffff });
+const emitterMatTail = new THREE.MeshBasicMaterial({ color: 0xaa0000 });
+// Tail strips
+const tailLightL = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.08, 0.1), emitterMatTail);
+tailLightL.position.set(-0.78, 0.72, 2.26);
+const tailLightR = tailLightL.clone();
+tailLightR.position.x = 0.78;
+car.add(tailLightL, tailLightR);
+car.userData.tailLights = [tailLightL, tailLightR];
+// Headlight strips
+const headLightL = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.06, 0.1), emitterMatHead);
+headLightL.position.set(-0.78, 0.58, -2.26);
+const headLightR = headLightL.clone();
+headLightR.position.x = 0.78;
+car.add(headLightL, headLightR);
+return car;
+}
+function createPlayerCar() {
+playerCar = createVehicle(0x00ffcc, true); // Acidic Cyan Paint Profile
+scene.add(playerCar);
+}
+// --- CYBER HIGHWAY ARCHITECTURE ENGINE ---
+function createHighway() {
+const hwWidth = laneWidth * totalLanes;
+const hwLength = 1200;
+const roadGeo = new THREE.PlaneGeometry(hwWidth, hwLength);
+const roadMat = new THREE.MeshStandardMaterial({
+color: 0x09090d,
+roughness: 0.5,
+metalness: 0.3
+});
+highway = new THREE.Mesh(roadGeo, roadMat);
+highway.rotation.x = -Math.PI / 2;
+highway.position.set(0, 0, -hwLength / 4);
+highway.receiveShadow = true;
+scene.add(highway);
+// Neon glowing boundary walls
+const wallMatL = new THREE.MeshBasicMaterial({ color: 0xff0055 });
+const wallMatR = new THREE.MeshBasicMaterial({ color: 0x00ffcc });
+const barrierL = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.4, hwLength), wallMatL);
+barrierL.position.set(-hwWidth/2, 0.2, -hwLength/4);
+const barrierR = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.4, hwLength), wallMatR);
+barrierR.position.set(hwWidth/2, 0.2, -hwLength/4);
+scene.add(barrierL, barrierR);
+// Dash Markings Configuration
+const lineMat = new THREE.MeshStandardMaterial({ color: 0x334466, roughness: 1.0, emissive: 0x111c33 });
+for(let i = 1; i < totalLanes; i++) {
+const lineX = -hwWidth/2 + (i * laneWidth);
+for(let z = 200; z > -1000; z -= 18) {
+const marker = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 5.0), lineMat);
+marker.rotation.x = -Math.PI / 2;
+marker.position.set(lineX, 0.015, z);
+scene.add(marker);
+}
+}
+// Endless Generative Synthwave Light Poles along the margin bounds
+for(let z = 200; z > -1000; z -= 65) {
+createLightPole(-hwWidth/2 - 2, z, 0xff0055);
+createLightPole(hwWidth/2 + 2, z, 0x00ffcc);
+}
+}
+function createLightPole(x, z, colorHex) {
+const poleGroup = new THREE.Group();
+poleGroup.position.set(x, 0, z);
+const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 11), new THREE.MeshStandardMaterial({color:0x111116}));
+pole.position.y = 5.5;
+poleGroup.add(pole);
+const arm = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.08, 0.08), new THREE.MeshStandardMaterial({color:0x111116}));
+arm.position.set(x > 0 ? -0.9 : 0.9, 11, 0);
+poleGroup.add(arm);
+const luminaire = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.15, 0.4), new THREE.MeshBasicMaterial({color: colorHex}));
+luminaire.position.set(x > 0 ? -1.8 : 1.8, 10.9, 0);
+poleGroup.add(luminaire);
+scene.add(poleGroup);
+neonPoles.push(poleGroup);
+}
+// --- DYNAMIC INTELLIGENT TRAFFIC ALGORITHMS ---
+function spawnInitialTraffic() {
+const palette = [0xff1144, 0x3366ff, 0xffbb00, 0xededff, 0x7700ff, 0xff6600];
+for (let i = 0; i < 14; i++) {
+const color = palette[Math.floor(Math.random() * palette.length)];
+const npc = createVehicle(color, false);
+resetNPCCar(npc);
+npc.position.z = -60 - (i * 38); // Distributed scatter allocation
+scene.add(npc);
+traffic.push(npc);
+}
+}
+function resetNPCCar(npc) {
+const assignedLane = Math.floor(Math.random() * totalLanes);
+const totalWidth = laneWidth * totalLanes;
+npc.position.x = -totalWidth / 2 + (assignedLane * laneWidth) + (laneWidth / 2);
+npc.position.z = playerCar.position.z - 300 - (Math.random() * 140);
+// Enhanced behavior modeling profiles
+npc.userData = {
+speed: 42 + Math.random() * 38,
+lane: assignedLane,
+targetX: npc.position.x,
+isChangingLane: false,
+laneChangeTimer: Math.random() * 5 + 2, // Changes lanes dynamically every couple seconds
+closeCallTriggered: false
 };
-
-function update(dt){
- if(!started)return;
- dt=Math.min(dt,.04);
-
- if(keys.w||keys.arrowup)speed+=45*dt;
- else speed-=12*dt;
- if(keys.s||keys.arrowdown)speed-=85*dt;
- drift=keys[" "];
- if(keys.shift&&nitro>0){
-  speed+=90*dt;
-  nitro-=25*dt;
- }else nitro=Math.min(100,nitro+7*dt);
- speed=THREE.MathUtils.clamp(speed,0,240);
-
- let direction=(keys.a||keys.arrowleft?-1:0)+(keys.d||keys.arrowright?1:0);
- steer=THREE.MathUtils.damp(steer,direction,5,dt);
- player.position.x+=steer*speed*.025*(drift?1.5:1)*dt;
- player.position.x=THREE.MathUtils.clamp(player.position.x,-11,11);
- player.rotation.z=THREE.MathUtils.damp(player.rotation.z,-steer*.2,5,dt);
-
- for(const w of player.userData.wheels)w.rotation.x+=speed*dt*.1;
-
- for(let i=traffic.length-1;i>=0;i--){
-  let t=traffic[i];
-  t.car.position.z+=(speed-t.speed)*.23*dt;
-  for(const w of t.car.userData.wheels)w.rotation.x+=t.speed*dt*.1;
-  if(Math.abs(t.car.position.z)<3.5&&Math.abs(t.car.position.x-player.position.x)<2.1){
-   speed*=.8;
-  }
-  if(t.car.position.z>15){
-   scene.remove(t.car);
-   traffic.splice(i,1);
-   spawn(-500-Math.random()*100);
-  }
- }
-
- for(const b of buildings){
-  b.position.z+=speed*.23*dt;
-  if(b.position.z>30)b.position.z=-550-Math.random()*100;
- }
-
- distance+=speed*dt/1609;
- document.getElementById("speed").innerHTML=Math.round(speed)+" <small>MPH</small>";
-
- const target=cam===0?
- new THREE.Vector3(player.position.x*.5,5,13):
- cam===1?
- new THREE.Vector3(player.position.x,2.4,4):
- new THREE.Vector3(player.position.x,10,19);
- camera.position.lerp(target,1-Math.exp(-4*dt));
- camera.lookAt(player.position.x*.5,1,-15);
 }
-
-let last=performance.now();
-function animate(now){
- requestAnimationFrame(animate);
- let dt=(now-last)/1000;
- last=now;
- update(dt);
- renderer.render(scene,camera);
+// --- IO INPUT MAPPING SUBSYSTEM ---
+function handleInput(e, isDown) {
+if (e.key in keys) keys[e.key] = isDown;
+if (e.code in keys) keys[e.code] = isDown;
 }
+function onResize() {
+camera.aspect = window.innerWidth / window.innerHeight;
+camera.updateProjectionMatrix();
+renderer.setSize(window.innerWidth, window.innerHeight);
+}
+// --- CORE KINETIC SIMULATION MATRIX ---
+function animate() {
+if (!gameActive) return;
 requestAnimationFrame(animate);
-
-addEventListener("resize",()=>{
- camera.aspect=innerWidth/innerHeight;
- camera.updateProjectionMatrix();
- renderer.setSize(innerWidth,innerHeight);
+globalTime += 0.016;
+// 1. Redline & Acceleration Math (RPM Simulation Mapping)
+let currentTargetSpeed = baseSpeed;
+if (keys.w || keys.ArrowUp) {
+currentTargetSpeed = maxSpeed;
+camVibration = THREE.MathUtils.lerp(camVibration, 0.16, 0.08);
+} else {
+camVibration = THREE.MathUtils.lerp(camVibration, 0.03, 0.1);
+}
+speed = THREE.MathUtils.lerp(speed, currentTargetSpeed, 0.035);
+// Update UI Gauges
+const calculatedVelocityScale = speed * 0.0052;
+score += Math.floor(calculatedVelocityScale * 0.6);
+document.getElementById('score-val').innerText = score.toString().padStart(6, '0');
+document.getElementById('speed-val').innerText = Math.floor(speed);
+const rpmPercentage = ((speed - baseSpeed) / (maxSpeed - baseSpeed)) * 100;
+document.getElementById('rpm-bar').style.width = ${Math.max(12, rpmPercentage)}%;
+// Endless Scenery Recycler
+highway.position.z += calculatedVelocityScale;
+if (highway.position.z > 200) highway.position.z = 0;
+neonPoles.forEach(pole => {
+pole.position.z += calculatedVelocityScale;
+if (pole.position.z > 40) pole.position.z = -800; // Loop poles right back down out of visibility range
 });
-</script>
-</body>
-</html>
+// 2. Interactive Body Physics & Rolling Steer Calcs
+const trackBoundaries = (laneWidth * totalLanes) / 2 - 1.15;
+let brakeActive = false;
+if (keys.a || keys.ArrowLeft) {
+targetLaneX -= 0.32;
+playerCar.rotation.y = THREE.MathUtils.lerp(playerCar.rotation.y, 0.14, 0.18);
+playerCar.rotation.z = THREE.MathUtils.lerp(playerCar.rotation.z, 0.06, 0.18); // Centrifugal body lean
+} else if (keys.d || keys.ArrowRight) {
+targetLaneX += 0.32;
+playerCar.rotation.y = THREE.MathUtils.lerp(playerCar.rotation.y, -0.14, 0.18);
+playerCar.rotation.z = THREE.MathUtils.lerp(playerCar.rotation.z, -0.06, 0.18);
+} else {
+playerCar.rotation.y = THREE.MathUtils.lerp(playerCar.rotation.y, 0, 0.14);
+playerCar.rotation.z = THREE.MathUtils.lerp(playerCar.rotation.z, 0, 0.14);
+}
+targetLaneX = THREE.MathUtils.clamp(targetLaneX, -trackBoundaries, trackBoundaries);
+playerCar.position.x = THREE.MathUtils.lerp(playerCar.position.x, targetLaneX, 0.18);
+// Wheel Spin Rotation Engine
+playerCar.userData.wheels.forEach(w => w.rotation.x -= (speed * 0.0015));
+// Dynamic brake lights illumination logic
+playerCar.userData.tailLights.forEach(light => {
+light.material.color.setHex(brakeActive ? 0xff0000 : 0xaa0000);
+});
+// 3. AI Traffic Navigation Loop (Lane Switching Systems)
+traffic.forEach(npc => {
+const relativeVelocity = calculatedVelocityScale - (npc.userData.speed * 0.0052);
+npc.position.z += relativeVelocity;
+// Wheels rotation matching individual vehicle speeds
+npc.userData.wheels.forEach(w => w.rotation.x -= (npc.userData.speed * 0.0015));
+// AI Engine Decision Branch: Manage Lane Changing
+npc.userData.laneChangeTimer -= 0.016;
+if(npc.userData.laneChangeTimer <= 0 && !npc.userData.isChangingLane) {
+const decisionRoll = Math.random() > 0.4;
+if(decisionRoll) {
+let potentialNewLane = npc.userData.lane + (Math.random() > 0.5 ? 1 : -1);
+if(potentialNewLane >= 0 && potentialNewLane < totalLanes) {
+npc.userData.lane = potentialNewLane;
+const totalWidth = laneWidth * totalLanes;
+npc.userData.targetX = -totalWidth / 2 + (potentialNewLane * laneWidth) + (laneWidth / 2);
+npc.userData.isChangingLane = true;
+}
+}
+npc.userData.laneChangeTimer = Math.random() * 6 + 3; // Reset clock
+}
+// Interpolate AI towards execution trajectories smoothly
+if(npc.userData.isChangingLane) {
+npc.position.x = THREE.MathUtils.lerp(npc.position.x, npc.userData.targetX, 0.04);
+// Light angle simulation relative to turning
+npc.rotation.y = THREE.MathUtils.lerp(npc.rotation.y, (npc.userData.targetX - npc.position.x) * 0.15, 0.1);
+if(Math.abs(npc.position.x - npc.userData.targetX) < 0.05) {
+npc.userData.isChangingLane = false;
+}
+} else {
+npc.rotation.y = THREE.MathUtils.lerp(npc.rotation.y, 0, 0.1);
+}
+// Recycle passed elements safely out ahead
+if (npc.position.z > 25) {
+resetNPCCar(npc);
+}
+// 4. Hitbox Collision Calculus Matrix
+const longitudinalSpacing = Math.abs(playerCar.position.x - npc.position.x);
+const latitudinalSpacing = Math.abs(playerCar.position.z - npc.position.z);
+if (longitudinalSpacing < 1.75 && latitudinalSpacing < 4.2) {
+endSession();
+}
+// Close Call Whiteline detection scoring logic
+if (longitudinalSpacing < 2.05 && latitudinalSpacing < 4.4 && !npc.userData.closeCallTriggered && latitudinalSpacing > 2.8) {
+npc.userData.closeCallTriggered = true;
+triggerComboEvent();
+}
+});
+// 5. Reactive Structural Camera Motion & Shake Vector
+camera.position.x = THREE.MathUtils.lerp(camera.position.x, playerCar.position.x * 0.75, 0.07);
+// Speed shaking algorithm mapping
+if(camVibration > 0.01) {
+camera.position.x += (Math.random() - 0.5) * camVibration;
+camera.position.y += (Math.random() - 0.5) * camVibration;
+}
+renderer.render(scene, camera);
+}
+// --- INTERFACE STATE CONTROLLERS ---
+function triggerComboEvent() {
+score += 1000;
+const notification = document.getElementById('combo-alert');
+notification.style.opacity = '1';
+notification.style.transform = 'translate(-50%, -50%) scale(1.05) rotate(-3deg)';
+setTimeout(() => {
+notification.style.opacity = '0';
+notification.style.transform = 'translate(-50%, -50%) scale(0.7)';
+}, 600);
+}
+function endSession() {
+gameActive = false;
+document.getElementById('final-score').innerText = score.toLocaleString();
+document.getElementById('game-over-screen').classList.add('active');
+}
+function resetGame() {
+score = 0;
+speed = baseSpeed;
+targetLaneX = 0;
+playerCar.position.set(0, 0, 0);
+playerCar.rotation.set(0, 0, 0);
+traffic.forEach(npc => {
+resetNPCCar(npc);
+npc.userData.closeCallTriggered = false;
+});
+document.getElementById('game-over-screen').classList.remove('active');
+gameActive = true;
+animate();
+}
+window.onload = init;
